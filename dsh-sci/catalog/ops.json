@@ -1,0 +1,383 @@
+[
+  {
+    "id": "expr.eval",
+    "domain": "expr",
+    "summary": "Evaluate a whitelisted expression at named quantities, with units and uncertainty.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "numeric",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr"],
+      "properties": {
+        "expr": { "type": "string" },
+        "vars": { "type": "object" },
+        "resultUnit": { "type": "string" },
+        "alsoNumeric": { "type": "boolean" }
+      }
+    }
+  },
+  {
+    "id": "calc.limit",
+    "domain": "calculus",
+    "summary": "Limit, including one-sided limits.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr", "var", "point"],
+      "properties": {
+        "expr": { "type": "string" },
+        "var": { "type": "string" },
+        "point": {},
+        "dir": { "type": "string", "enum": ["+", "-"] },
+        "alsoNumeric": { "type": "boolean" }
+      }
+    }
+  },
+  {
+    "id": "calc.diff",
+    "domain": "calculus",
+    "summary": "Derivative, higher derivative, or partial derivative.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr"],
+      "properties": {
+        "expr": { "type": "string" },
+        "var": { "type": "string" },
+        "order": { "type": "integer", "minimum": 1 },
+        "respect": { "type": "array" },
+        "alsoNumeric": { "type": "boolean" }
+      }
+    }
+  },
+  {
+    "id": "calc.integrate",
+    "domain": "calculus",
+    "summary": "Indefinite, definite, or improper integral. No elementary antiderivative stays no_closed_form.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr", "var"],
+      "properties": {
+        "expr": { "type": "string" },
+        "var": { "type": "string" },
+        "a": {},
+        "b": {},
+        "alsoNumeric": { "type": "boolean" }
+      }
+    }
+  },
+  {
+    "id": "calc.series",
+    "domain": "calculus",
+    "summary": "Taylor series.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr", "var"],
+      "properties": {
+        "expr": { "type": "string" },
+        "var": { "type": "string" },
+        "point": {},
+        "order": { "type": "integer", "minimum": 1 },
+        "alsoNumeric": { "type": "boolean" }
+      }
+    }
+  },
+  {
+    "id": "calc.ode",
+    "domain": "calculus",
+    "summary": "Symbolic solution of an ordinary differential equation set equal to zero.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eq", "func", "ivar"],
+      "properties": {
+        "eq": { "type": "string" },
+        "func": { "type": "string" },
+        "ivar": { "type": "string" },
+        "ics": { "type": "array" },
+        "alsoNumeric": { "type": "boolean" }
+      }
+    }
+  },
+  {
+    "id": "la.det",
+    "domain": "linear_algebra",
+    "summary": "Determinant.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["matrix"], "properties": { "matrix": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.rank",
+    "domain": "linear_algebra",
+    "summary": "Matrix rank.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["matrix"], "properties": { "matrix": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.inverse",
+    "domain": "linear_algebra",
+    "summary": "Matrix inverse. Singular matrices do not get an invented inverse.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["matrix"], "properties": { "matrix": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.rref",
+    "domain": "linear_algebra",
+    "summary": "Reduced row echelon form.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["matrix"], "properties": { "matrix": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.solve",
+    "domain": "linear_algebra",
+    "summary": "Linear system. No unique solution returns singular.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["a", "b"], "properties": { "a": { "type": "array" }, "b": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.eigen",
+    "domain": "linear_algebra",
+    "summary": "Eigenvalues and eigenvectors.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["matrix"], "properties": { "matrix": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.diag",
+    "domain": "linear_algebra",
+    "summary": "Diagonalization when the matrix is diagonalizable.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["matrix"], "properties": { "matrix": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.nullspace",
+    "domain": "linear_algebra",
+    "summary": "Null space basis.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["matrix"], "properties": { "matrix": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.gramschmidt",
+    "domain": "linear_algebra",
+    "summary": "Gram-Schmidt orthogonalization.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["vectors"], "properties": { "vectors": { "type": "array" }, "orthonormal": { "type": "boolean" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "la.least_squares",
+    "domain": "linear_algebra",
+    "summary": "Exact least-squares solution of a linear system.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "exact",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["a", "b"], "properties": { "a": { "type": "array" }, "b": { "type": "array" }, "alsoNumeric": { "type": "boolean" } } }
+  },
+  {
+    "id": "fit.linear",
+    "domain": "fit",
+    "summary": "Ordinary or weighted straight-line fit: slope, intercept, correlation, and slope uncertainty.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "lab",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": {},
+        "y": {},
+        "weights": { "type": "array" },
+        "coverageFactor": { "type": "number" }
+      }
+    }
+  },
+  {
+    "id": "stats.reduce",
+    "domain": "stats",
+    "summary": "Repeated measurements: mean, sample standard deviation, standard uncertainty of the mean, and n.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "lab",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["values"],
+      "properties": {
+        "values": {},
+        "coverageFactor": { "type": "number" }
+      }
+    }
+  },
+  {
+    "id": "uncertainty.propagate",
+    "domain": "uncertainty",
+    "summary": "Analytical uncertainty propagation, with optional covariance.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "lab",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr", "vars"],
+      "properties": {
+        "expr": { "type": "string" },
+        "vars": { "type": "object" },
+        "covariance": { "type": "array" },
+        "resultUnit": { "type": "string" },
+        "coverageFactor": { "type": "number" }
+      }
+    }
+  },
+  {
+    "id": "units.convert",
+    "domain": "units",
+    "summary": "Convert a quantity between compatible units.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "numeric",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit", "to"],
+      "properties": {
+        "value": { "type": "number" },
+        "unit": { "type": "string" },
+        "to": { "type": "string" }
+      }
+    }
+  },
+  {
+    "id": "units.check",
+    "domain": "units",
+    "summary": "Check whether an expression is dimensionally homogeneous.",
+    "engine": "py",
+    "implemented": true,
+    "defaultMode": "numeric",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expr", "units"],
+      "properties": {
+        "expr": { "type": "string" },
+        "units": { "type": "object" }
+      }
+    }
+  },
+  {
+    "id": "quantity.format",
+    "domain": "quantity",
+    "summary": "Format a value and uncertainty as a report string.",
+    "engine": "js",
+    "implemented": true,
+    "defaultMode": "lab",
+    "argsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value"],
+      "properties": {
+        "value": { "type": "number" },
+        "uncertainty": { "type": "number" },
+        "unit": { "type": "string" }
+      }
+    }
+  },
+  {
+    "id": "fit.nonlinear",
+    "domain": "fit",
+    "summary": "Nonlinear curve fit and parameter uncertainties.",
+    "engine": "py",
+    "implemented": false,
+    "defaultMode": "lab",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "x", "y"], "properties": { "expr": { "type": "string" }, "x": { "type": "array" }, "y": { "type": "array" }, "seed": { "type": "integer" } } }
+  },
+  {
+    "id": "uncertainty.montecarlo",
+    "domain": "uncertainty",
+    "summary": "Monte Carlo uncertainty propagation. Requires a seed and a draw cap.",
+    "engine": "py",
+    "implemented": false,
+    "defaultMode": "lab",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "vars", "seed"], "properties": { "expr": { "type": "string" }, "vars": { "type": "object" }, "seed": { "type": "integer" }, "draws": { "type": "integer" } } }
+  },
+  {
+    "id": "signal.fft",
+    "domain": "signal",
+    "summary": "Discrete Fourier transform.",
+    "engine": "py",
+    "implemented": false,
+    "defaultMode": "numeric",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["values"], "properties": { "values": { "type": "array" } } }
+  },
+  {
+    "id": "optimize.minimize",
+    "domain": "optimize",
+    "summary": "Numerical minimization.",
+    "engine": "py",
+    "implemented": false,
+    "defaultMode": "numeric",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "vars"], "properties": { "expr": { "type": "string" }, "vars": { "type": "object" }, "seed": { "type": "integer" } } }
+  },
+  {
+    "id": "calc.roots",
+    "domain": "calculus",
+    "summary": "Numerical or symbolic roots of an equation.",
+    "engine": "py",
+    "implemented": false,
+    "defaultMode": "numeric",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "var"], "properties": { "expr": { "type": "string" }, "var": { "type": "string" } } }
+  },
+  {
+    "id": "calc.nintegrate",
+    "domain": "calculus",
+    "summary": "Numerical integral used only when a closed form is not requested.",
+    "engine": "py",
+    "implemented": false,
+    "defaultMode": "numeric",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "var", "a", "b"], "properties": { "expr": { "type": "string" }, "var": { "type": "string" }, "a": {}, "b": {} } }
+  },
+  {
+    "id": "ode.ivp",
+    "domain": "ode",
+    "summary": "Numerical initial-value problem when no symbolic solution is used.",
+    "engine": "py",
+    "implemented": false,
+    "defaultMode": "numeric",
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["eq", "func", "ivar"], "properties": { "eq": { "type": "string" }, "func": { "type": "string" }, "ivar": { "type": "string" }, "ics": { "type": "array" } } }
+  }
+]

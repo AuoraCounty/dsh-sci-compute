@@ -1,0 +1,11 @@
+{
+  "source": "Handwritten calibration transcribed in C:/Users/auora/Documents/deepseek-harness/default-workspace/tmp/build_report.py lines 11-16 (comment: numbers from the handwritten record) and the two zeroed film voltages on lines 41-42. Ring diameters were not in the notes.",
+  "g": 9.8,
+  "massesG": [0.5, 1, 1.5, 2, 2.5, 3, 3.5],
+  "voltagesMV": [1.75, 3.48, 5.22, 6.96, 8.69, 10.43, 12.17],
+  "pulls": [
+    { "u1": 19.4, "u2": 12.45 },
+    { "u1": 20.27, "u2": 7.56 }
+  ],
+  "recordedK": 354.44
+}
