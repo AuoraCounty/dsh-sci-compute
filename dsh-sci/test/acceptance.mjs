@@ -41,6 +41,13 @@ test("only two tools are registered by the package", () => {
   assert.deepEqual(names, TOOL_NAMES);
 });
 
+test("host tool registration can resolve defineTool and object args", () => {
+  const source = readFileSync(join(root, "index.js"), "utf8");
+  assert.match(source, /import \{ defineTool \} from "@deepseek-ai\/dsh-tools"/);
+  assert.equal(source.includes("defineTool = null"), false);
+  assert.match(source, /args:\s*\{[^}]*additionalProperties:\s*true/s);
+});
+
 test("plugin source does not embed ring nominal diameters", () => {
   const blob = walk(root).map((path) => readFileSync(path, "utf8")).join("\n");
   assert.equal(blob.includes("3.500"), false);

@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { defineTool } from "@deepseek-ai/dsh-tools";
 import { compute, DEFAULT_CONFIG, sciCatalog } from "./lib/dispatch.js";
 
 const require = createRequire(import.meta.url);
@@ -15,15 +16,8 @@ export const Config = Schema.object({
   pythonPath: Schema.string().default(""),
 });
 
-let defineTool;
-try {
-  ({ defineTool } = require("@deepseek-ai/dsh-tools"));
-} catch {
-  defineTool = null;
-}
-
 export function apply(ctx, config = {}) {
-  if (!defineTool || !ctx?.tools?.register) return;
+  if (!ctx?.tools?.register) return;
   const cfg = { ...DEFAULT_CONFIG, ...config };
   ctx.tools.register(defineTool({
     name: "sci_catalog",
@@ -50,7 +44,7 @@ export function apply(ctx, config = {}) {
     description: "Run one catalog operation. The model chooses the operation and writes the expression; this tool only computes. Results are exact, numeric, or lab. Missing measurements are not filled with instrument nominals.",
     parameters: {
       op: { type: "string", required: true, description: "Operation id from sci_catalog, such as calc.integrate or fit.linear." },
-      args: { type: "object", required: true, description: "Arguments matching that operation's argsSchema." },
+      args: { type: "object", additionalProperties: true, required: true, description: "Arguments matching that operation's argsSchema." },
       mode: { type: "string", description: "Optional exact, numeric, or lab. Overrides the profile default." },
       profile: { type: "string", description: "Optional calculus, linear_algebra, physics_lab, or physics. Sets the default mode and extra checks." },
     },
