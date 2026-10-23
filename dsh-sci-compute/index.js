@@ -1,10 +1,7 @@
-import { createRequire } from "node:module";
 import { defineTool } from "@deepseek-ai/dsh-tools";
+import Schema from "@deepseek-ai/schemastery";
 import { compute, DEFAULT_CONFIG, sciCatalog } from "./lib/dispatch.js";
 import { retain } from "./lib/retain.js";
-
-const require = createRequire(import.meta.url);
-const Schema = require("@deepseek-ai/schemastery");
 
 export const name = "@local/dsh-sci-compute";
 export const inject = ["tools"];

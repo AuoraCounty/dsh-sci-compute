@@ -45,6 +45,8 @@ test("only two tools are registered by the package", () => {
 test("host tool registration can resolve defineTool and object args", () => {
   const source = readFileSync(join(root, "index.js"), "utf8");
   assert.match(source, /import \{ defineTool \} from "@deepseek-ai\/dsh-tools"/);
+  assert.match(source, /import Schema from "@deepseek-ai\/schemastery"/);
+  assert.equal(source.includes("createRequire"), false);
   assert.equal(source.includes("defineTool = null"), false);
   assert.match(source, /args:\s*\{[^}]*additionalProperties:\s*true/s);
   assert.match(source, /retain\(ctx, \(\) => \{/);
