@@ -1,0 +1,4 @@
+# @local/dsh-sci-compute — open scientific-computing catalog.
+- insert:
+    - id: dsh-sci-compute
+      name: '@local/dsh-sci-compute'

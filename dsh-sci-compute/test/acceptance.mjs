@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { clearHealthCache, compute, packageRoot, sciCatalog, TOOL_NAMES } from "../lib/dispatch.js";
 import { parseExpr } from "../lib/expr.js";
+import { retain } from "../lib/retain.js";
 
 const cases = [];
 function test(name, fn) {
@@ -46,6 +47,37 @@ test("host tool registration can resolve defineTool and object args", () => {
   assert.match(source, /import \{ defineTool \} from "@deepseek-ai\/dsh-tools"/);
   assert.equal(source.includes("defineTool = null"), false);
   assert.match(source, /args:\s*\{[^}]*additionalProperties:\s*true/s);
+  assert.match(source, /retain\(ctx, \(\) => \{/);
+  assert.match(source, /return \(\) => \{\s*stopCatalog\(\);\s*stopCompute\(\);/s);
+});
+
+test("releasing retained tools allows the same names to mount again", () => {
+  const names = new Set();
+  const ctx = {
+    effect(open) {
+      this.stop = open();
+    },
+    tools: {
+      register(tool) {
+        if (names.has(tool.name)) throw new Error(`tool "${tool.name}" is already registered`);
+        names.add(tool.name);
+        return () => names.delete(tool.name);
+      },
+    },
+  };
+  const open = () => {
+    const stopCatalog = ctx.tools.register({ name: "sci_catalog" });
+    const stopCompute = ctx.tools.register({ name: "sci_compute" });
+    return () => {
+      stopCatalog();
+      stopCompute();
+    };
+  };
+  retain(ctx, open);
+  assert.throws(() => retain(ctx, open), /already registered/);
+  ctx.stop();
+  retain(ctx, open);
+  assert.deepEqual([...names], ["sci_catalog", "sci_compute"]);
 });
 
 test("plugin source does not embed ring nominal diameters", () => {

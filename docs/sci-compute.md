@@ -241,11 +241,11 @@ id 一旦发布就保持稳定。实现可以分批，目录项先登记。
 
 ## 12. 包
 
-工作区内一个 Host 插件包，建议名 `@local/dsh-sci`。
+工作区内一个 Host 插件包，包名 `@local/dsh-sci-compute`。
 
 ```
 package.json          dsh.bundle.patch 指向 cordis.patch.yml
-cordis.patch.yml      insert，id: dsh-sci
+cordis.patch.yml      insert，id: dsh-sci-compute
 index.js              export function apply；inject 包含 tools；export const Config
 locale/zh.json        meta.title、meta.description
 locale/en.json

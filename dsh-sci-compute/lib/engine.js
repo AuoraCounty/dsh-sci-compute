@@ -87,7 +87,7 @@ function scratchDir() {
     mkdirSync(local, { recursive: true });
     return local;
   } catch {
-    const fallback = join(tmpdir(), "dsh-sci");
+    const fallback = join(tmpdir(), "dsh-sci-compute");
     mkdirSync(fallback, { recursive: true });
     return fallback;
   }
