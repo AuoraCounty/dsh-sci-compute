@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { clearHealthCache, compute, packageRoot, sciCatalog, TOOL_NAMES } from "../lib/dispatch.js";
@@ -40,6 +41,11 @@ test("only two tools are registered by the package", () => {
   const source = readFileSync(join(root, "index.js"), "utf8");
   const names = [...source.matchAll(/name: "([^"]+)"/g)].map((match) => match[1]);
   assert.deepEqual(names, TOOL_NAMES);
+});
+
+test("schemastery resolves beside the package, which hot-mount imports by real path", () => {
+  const resolved = createRequire(join(root, "package.json")).resolve("@deepseek-ai/schemastery");
+  assert.equal(resolved.includes(`${join(root, "node_modules")}`), true);
 });
 
 test("host tool registration can resolve defineTool and object args", () => {
