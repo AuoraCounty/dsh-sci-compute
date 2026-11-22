@@ -320,27 +320,27 @@
   {
     "id": "fit.nonlinear",
     "domain": "fit",
-    "summary": "Nonlinear curve fit and parameter uncertainties.",
+    "summary": "Nonlinear curve fit and parameter uncertainties. The independent variable in expr is x; every other name is a parameter.",
     "engine": "py",
-    "implemented": false,
+    "implemented": true,
     "defaultMode": "lab",
-    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "x", "y"], "properties": { "expr": { "type": "string" }, "x": { "type": "array" }, "y": { "type": "array" }, "seed": { "type": "integer" } } }
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "x", "y"], "properties": { "expr": { "type": "string" }, "x": { "type": "array" }, "y": { "type": "array" }, "seed": { "type": "integer" }, "p0": { "type": "object" } } }
   },
   {
     "id": "uncertainty.montecarlo",
     "domain": "uncertainty",
     "summary": "Monte Carlo uncertainty propagation. Requires a seed and a draw cap.",
     "engine": "py",
-    "implemented": false,
+    "implemented": true,
     "defaultMode": "lab",
-    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "vars", "seed"], "properties": { "expr": { "type": "string" }, "vars": { "type": "object" }, "seed": { "type": "integer" }, "draws": { "type": "integer" } } }
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "vars", "seed"], "properties": { "expr": { "type": "string" }, "vars": { "type": "object" }, "seed": { "type": "integer" }, "draws": { "type": "integer" }, "resultUnit": { "type": "string" } } }
   },
   {
     "id": "signal.fft",
     "domain": "signal",
     "summary": "Discrete Fourier transform.",
     "engine": "py",
-    "implemented": false,
+    "implemented": true,
     "defaultMode": "numeric",
     "argsSchema": { "type": "object", "additionalProperties": false, "required": ["values"], "properties": { "values": { "type": "array" } } }
   },
@@ -349,7 +349,7 @@
     "domain": "optimize",
     "summary": "Numerical minimization.",
     "engine": "py",
-    "implemented": false,
+    "implemented": true,
     "defaultMode": "numeric",
     "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "vars"], "properties": { "expr": { "type": "string" }, "vars": { "type": "object" }, "seed": { "type": "integer" } } }
   },
@@ -358,7 +358,7 @@
     "domain": "calculus",
     "summary": "Numerical or symbolic roots of an equation.",
     "engine": "py",
-    "implemented": false,
+    "implemented": true,
     "defaultMode": "numeric",
     "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "var"], "properties": { "expr": { "type": "string" }, "var": { "type": "string" } } }
   },
@@ -367,7 +367,7 @@
     "domain": "calculus",
     "summary": "Numerical integral used only when a closed form is not requested.",
     "engine": "py",
-    "implemented": false,
+    "implemented": true,
     "defaultMode": "numeric",
     "argsSchema": { "type": "object", "additionalProperties": false, "required": ["expr", "var", "a", "b"], "properties": { "expr": { "type": "string" }, "var": { "type": "string" }, "a": {}, "b": {} } }
   },
@@ -376,8 +376,8 @@
     "domain": "ode",
     "summary": "Numerical initial-value problem when no symbolic solution is used.",
     "engine": "py",
-    "implemented": false,
+    "implemented": true,
     "defaultMode": "numeric",
-    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["eq", "func", "ivar"], "properties": { "eq": { "type": "string" }, "func": { "type": "string" }, "ivar": { "type": "string" }, "ics": { "type": "array" } } }
+    "argsSchema": { "type": "object", "additionalProperties": false, "required": ["eq", "func", "ivar"], "properties": { "eq": { "type": "string" }, "func": { "type": "string" }, "ivar": { "type": "string" }, "ics": { "type": "array" }, "points": { "type": "array" } } }
   }
 ]

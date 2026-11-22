@@ -32,9 +32,11 @@ test("catalog lists implemented and registered operations", async () => {
   for (const id of ["calc.integrate", "la.rref", "la.eigen", "fit.linear", "stats.reduce", "uncertainty.propagate", "units.convert", "quantity.format", "fit.nonlinear", "signal.fft", "uncertainty.montecarlo", "calc.nintegrate", "ode.ivp"]) {
     assert.ok(ids.includes(id), id);
   }
-  const fft = page.ops.find((op) => op.id === "signal.fft");
-  assert.equal(fft.available, false);
-  assert.equal(fft.engine, "py");
+  for (const id of ["fit.nonlinear", "uncertainty.montecarlo", "signal.fft", "optimize.minimize", "calc.roots", "calc.nintegrate", "ode.ivp"]) {
+    const op = page.ops.find((item) => item.id === id);
+    assert.equal(op.available, true, id);
+    assert.equal(op.engine, "py", id);
+  }
 });
 
 test("only two tools are registered by the package", () => {
@@ -135,10 +137,81 @@ test("non-elementary integral is not replaced by a decimal", async () => {
   assert.equal(result.numeric, null);
 });
 
-test("registered fft call does not return a javascript approximation", async () => {
+test("fft of [1, 0, 1, 0] is computed by the python engine", async () => {
   const result = await compute({ op: "signal.fft", args: { values: [1, 0, 1, 0] } });
-  assert.equal(result.status, "engine_unavailable");
-  assert.equal(result.numeric, null);
+  assert.equal(result.status, "ok");
+  assert.equal(result.engine, "py");
+  assert.equal(result.method, "fft");
+  assert.deepEqual(result.numeric.re.map((value) => Math.round(value)), [2, 0, 2, 0]);
+  for (const value of result.numeric.im) assert.ok(Math.abs(value) < 1e-8);
+});
+
+test("nonlinear fit recovers a quadratic", async () => {
+  const result = await compute({
+    op: "fit.nonlinear",
+    args: { expr: "a*x**2+b", x: [0, 1, 2, 3], y: [3, 5, 11, 21] },
+  });
+  assert.equal(result.status, "ok", JSON.stringify(result));
+  assert.equal(result.engine, "py");
+  assert.ok(Math.abs(result.lab.params.a.value - 2) < 1e-8);
+  assert.ok(Math.abs(result.lab.params.b.value - 3) < 1e-8);
+});
+
+test("monte carlo mean and spread are reproducible from the seed", async () => {
+  const args = { expr: "a", vars: { a: { value: 10, uncertainty: 2 } }, seed: 7, draws: 20000 };
+  const first = await compute({ op: "uncertainty.montecarlo", args });
+  const second = await compute({ op: "uncertainty.montecarlo", args });
+  assert.equal(first.status, "ok", JSON.stringify(first));
+  assert.equal(first.seed, 7);
+  assert.equal(first.lab.draws, 20000);
+  assert.ok(Math.abs(first.lab.value - 10) < 0.15);
+  assert.ok(Math.abs(first.lab.uncertainty - 2) < 0.15);
+  assert.equal(first.lab.value, second.lab.value);
+  assert.equal(first.lab.uncertainty, second.lab.uncertainty);
+});
+
+test("minimize finds the vertex of a paraboloid", async () => {
+  const result = await compute({
+    op: "optimize.minimize",
+    args: { expr: "(x-2)**2+(y+1)**2", vars: { x: 0, y: 0 } },
+  });
+  assert.equal(result.status, "ok", JSON.stringify(result));
+  assert.ok(Math.abs(result.numeric.value) < 1e-6);
+  assert.ok(Math.abs(result.numeric.x.x - 2) < 1e-4);
+  assert.ok(Math.abs(result.numeric.x.y + 1) < 1e-4);
+});
+
+test("numeric and exact roots of x**2-1 are -1 and 1", async () => {
+  const numeric = await compute({ op: "calc.roots", args: { expr: "x**2-1", var: "x" } });
+  assert.equal(numeric.status, "ok", JSON.stringify(numeric));
+  assert.equal(numeric.mode, "numeric");
+  assert.ok(numeric.numeric.real.some((value) => Math.abs(value + 1) < 1e-8));
+  assert.ok(numeric.numeric.real.some((value) => Math.abs(value - 1) < 1e-8));
+  const exact = await compute({ op: "calc.roots", profile: "calculus", args: { expr: "x**2-4", var: "x" } });
+  assert.equal(exact.status, "ok", JSON.stringify(exact));
+  assert.equal(exact.mode, "exact");
+  assert.match(exact.exact.expr, /-2/);
+  assert.match(exact.exact.expr, /\b2\b/);
+  assert.doesNotMatch(exact.exact.expr, /\d+\.\d+/);
+});
+
+test("numerical integral of exp(-x**2) and a divergent improper integral", async () => {
+  const finite = await compute({ op: "calc.nintegrate", args: { expr: "exp(-x**2)", var: "x", a: 0, b: 1 } });
+  assert.equal(finite.status, "ok", JSON.stringify(finite));
+  assert.ok(Math.abs(finite.numeric.value - 0.7468241328124271) < 1e-9);
+  const divergent = await compute({ op: "calc.nintegrate", args: { expr: "1/x", var: "x", a: 1, b: "oo" } });
+  assert.equal(divergent.status, "diverges");
+  assert.equal(divergent.numeric, null);
+});
+
+test("numerical solution of y'-y=0 at x=1 is e", async () => {
+  const result = await compute({
+    op: "ode.ivp",
+    args: { eq: "Derivative(y)-y", func: "y", ivar: "x", ics: [{ point: 0, value: 1 }], points: [0, 1] },
+  });
+  assert.equal(result.status, "ok", JSON.stringify(result));
+  assert.equal(result.engine, "py");
+  assert.ok(Math.abs(result.numeric.value - Math.E) < 1e-5);
 });
 
 test("surface tension points reproduce the recorded sensitivity and reject missing diameters", async () => {

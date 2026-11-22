@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-sci-compute",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "开放计算目录。高等数学和线性代数默认精确式，物理实验默认不确定度。",
   "type": "module",
   "main": "./index.js",

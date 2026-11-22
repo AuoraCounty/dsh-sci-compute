@@ -198,9 +198,9 @@ id 一旦发布就保持稳定。实现可以分批，目录项先登记。
 
 `expr.eval`、`calc.*` 和 `uncertainty.propagate` 的表达式不是 Python。只允许数字、名字、四则、幂、括号，以及白名单函数（`sin`、`cos`、`tan`、`exp`、`log`、`sqrt`、`Abs` 等，实现时写成显式列表）。拒绝属性访问、下标里的代码、导入和任何语句。解析失败就报错。
 
-### 第一版只登记，引擎未就绪时可返回 `engine_unavailable`
+### 数值运算
 
-这些 id 必须出现在 `sci_catalog` 里，不能等做完了才起名字。
+这些 id 一开始只登记、调用返回 `engine_unavailable`。运行时里的 numpy 和 scipy 已经接上之后，由 py 引擎实现。scipy 导入失败时仍返回 `engine_unavailable`，不得改由 JavaScript 给出近似值。
 
 | id | 做什么 |
 |---|---|
@@ -269,7 +269,7 @@ test/                 金样和不变量
 4. 奇异方程组返回 `singular`，不返回一个凑出来的解。
 5. 发散的反常积分或极限返回 `diverges`。
 6. 表面张力金样：用取回的原始定标点和两次拉膜电压，得到 k = 354.44 mV/N 和两次 α。吊环内外径不在输入里时，`status` 为 `missing_input`，`missing` 含内外径，结果里不得出现 3.500 cm 或 3.300 cm。
-7. 对 `fit.nonlinear` 或 `signal.fft`，在实现完成前调用得到 `engine_unavailable`，而不是一个 JS 近似值。
+7. `fit.nonlinear`、`uncertainty.montecarlo`、`signal.fft`、`optimize.minimize`、`calc.roots`、`calc.nintegrate`、`ode.ivp` 由 py 引擎计算。`[1, 0, 1, 0]` 的离散傅里叶变换是 `[2, 0, 2, 0]`。scipy 导入失败时返回 `engine_unavailable`，不得改由 JS 给出近似值。
 8. 表达式参数中的属性访问或导入被拒绝。
 9. 工具面仍然只有 `sci_catalog` 和 `sci_compute`。
 

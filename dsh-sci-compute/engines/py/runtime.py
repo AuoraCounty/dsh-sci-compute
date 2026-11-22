@@ -154,6 +154,13 @@ def dispatch(req):
         "uncertainty.propagate": op_propagate,
         "units.convert": op_convert,
         "units.check": op_check,
+        "fit.nonlinear": op_nonlinear,
+        "uncertainty.montecarlo": op_montecarlo,
+        "signal.fft": op_fft,
+        "optimize.minimize": op_minimize,
+        "calc.roots": op_roots,
+        "calc.nintegrate": op_nintegrate,
+        "ode.ivp": op_ivp,
     }
     if op not in table:
         return blank(req, "engine_unavailable", "not_implemented")
@@ -475,6 +482,407 @@ def op_check(req, args):
     except Fail:
         raise
     return blank(req, "ok", "check", numeric={"value": True})
+
+
+def op_nonlinear(req, args):
+    import numpy as np
+    from scipy.optimize import curve_fit
+    sympy = req["_sympy"]
+    expr = build(args["expr"], {"funcs": set(), "ivar": None}, sympy)
+    xs, x_unit = column(args["x"], req)
+    ys, y_unit = column(args["y"], req)
+    if len(xs) != len(ys) or len(xs) < 2:
+        raise Fail("missing_input", missing=["x", "y"], method="curve_fit")
+    x_sym = sympy.Symbol("x")
+    params = sorted((sym for sym in expr.free_symbols if sym != x_sym), key=lambda sym: sym.name)
+    if not params or len(xs) < len(params):
+        raise Fail("missing_input", missing=["parameters"], method="curve_fit")
+    supplied = args.get("p0") or {}
+    guess = []
+    for sym in params:
+        if sym.name in supplied:
+            value, _unit, _uncertainty, _present = quantity_of(supplied[sym.name])
+            if value is None:
+                raise Fail("missing_input", missing=[sym.name], method="curve_fit")
+            guess.append(float(value))
+        else:
+            guess.append(1.0)
+    guess = np.asarray(guess, dtype=float)
+    seed = args.get("seed")
+    if seed is not None and not supplied:
+        rng = np.random.default_rng(int(seed))
+        guess = guess * rng.normal(1.0, 0.25, size=len(params))
+    def model(xdata, *theta):
+        values = {x_sym: np.asarray(xdata, dtype=float)}
+        for sym, val in zip(params, theta):
+            values[sym] = float(val)
+        out = numeric_of(expr, values, sympy)
+        return np.broadcast_to(np.asarray(out, dtype=float), np.shape(xdata)).copy()
+    try:
+        fitted, covariance = curve_fit(model, np.asarray(xs, dtype=float), np.asarray(ys, dtype=float), p0=guess, maxfev=20000)
+    except Exception:
+        return blank(req, "singular", "curve_fit", seed=seed)
+    coverage = float(args.get("coverageFactor") or req.get("coverageFactor") or 1)
+    rendered = {}
+    for index, sym in enumerate(params):
+        variance = float(covariance[index][index])
+        uncertainty = math.sqrt(variance) * coverage if math.isfinite(variance) and variance >= 0 else None
+        rendered[sym.name] = {"value": float(fitted[index]), "uncertainty": uncertainty}
+    primary = params[0].name
+    details = {
+        "value": rendered[primary]["value"],
+        "uncertainty": rendered[primary]["uncertainty"],
+        "unit": y_unit,
+        "params": rendered,
+        "xUnit": x_unit,
+        "n": len(xs),
+    }
+    if req.get("mode") == "numeric":
+        return blank(req, "ok", "curve_fit", numeric=details, seed=seed)
+    return blank(req, "ok", "curve_fit", lab=details, seed=seed)
+
+
+def op_montecarlo(req, args):
+    import numpy as np
+    sympy = req["_sympy"]
+    expr = build(args["expr"], {"funcs": set(), "ivar": None}, sympy)
+    seed = args.get("seed")
+    if seed is None:
+        raise Fail("missing_input", missing=["seed"], method="montecarlo")
+    cap = int((req.get("limits") or {}).get("monteCarloMaxDraws") or 100000)
+    draws = int(args.get("draws") or min(10000, cap))
+    if draws < 1 or draws > cap:
+        raise Fail("missing_input", missing=["monteCarloMaxDraws"], method="montecarlo")
+    variables = args.get("vars") or {}
+    require_units = req.get("profile") in ("physics", "physics_lab")
+    dim = dimension_of(args["expr"], variables, require_units)
+    result_unit = args.get("resultUnit")
+    target = parse_unit(result_unit) if result_unit else dim
+    if result_unit and target[1] != dim[1]:
+        raise Fail("dimension_error", method="units")
+    rng = np.random.default_rng(int(seed))
+    samples = {}
+    for name, raw in variables.items():
+        value, unit, uncertainty, present = quantity_of(raw)
+        if value is None:
+            raise Fail("missing_input", missing=[name], method="montecarlo")
+        scale = parse_unit(unit)[0] if unit else 1.0
+        center = float(value) * scale
+        symbol = sympy.Symbol(name)
+        if present and uncertainty is not None:
+            samples[symbol] = center + rng.normal(0.0, float(uncertainty) * scale, size=draws)
+        else:
+            samples[symbol] = center
+    shown = np.asarray(numeric_of(expr, samples, sympy), dtype=float) / (target[0] or 1.0)
+    mean = float(np.mean(shown))
+    uncertainty = float(np.std(shown, ddof=1)) * float(args.get("coverageFactor") or req.get("coverageFactor") or 1) if draws > 1 else None
+    details = {"value": mean, "uncertainty": uncertainty, "unit": result_unit, "draws": draws}
+    if req.get("mode") == "numeric":
+        return blank(req, "ok", "montecarlo", numeric=details, seed=int(seed))
+    return blank(req, "ok", "montecarlo", lab=details, seed=int(seed))
+
+
+def op_fft(req, args):
+    import numpy as np
+    from scipy.fft import fft
+    values, unit = column(args["values"], req)
+    if len(values) < 1:
+        raise Fail("missing_input", missing=["values"], method="fft")
+    spectrum = fft(np.asarray(values, dtype=float))
+    re = [float(item.real) for item in spectrum]
+    im = [float(item.imag) for item in spectrum]
+    details = {"value": re[0], "unit": unit, "n": len(values), "re": re, "im": im}
+    if req.get("mode") == "lab":
+        return blank(req, "ok", "fft", lab={"value": re[0], "uncertainty": None, "unit": unit, "n": len(values), "re": re, "im": im})
+    return blank(req, "ok", "fft", numeric=details)
+
+
+def op_minimize(req, args):
+    import numpy as np
+    from scipy.optimize import minimize
+    sympy = req["_sympy"]
+    expr = build(args["expr"], {"funcs": set(), "ivar": None}, sympy)
+    variables = args.get("vars") or {}
+    symbols = sorted(expr.free_symbols, key=lambda sym: sym.name)
+    missing = [sym.name for sym in symbols if quantity_of(variables.get(sym.name))[0] is None]
+    if missing:
+        raise Fail("missing_input", missing=missing, method="minimize")
+    start = np.asarray([float(quantity_of(variables[sym.name])[0]) for sym in symbols], dtype=float)
+    def objective(theta):
+        values = {sym: float(val) for sym, val in zip(symbols, theta)}
+        return float(np.asarray(numeric_of(expr, values, sympy), dtype=float).reshape(-1)[0])
+    seed = args.get("seed")
+    starts = [start]
+    if seed is not None:
+        rng = np.random.default_rng(int(seed))
+        for _ in range(7):
+            starts.append(start + rng.normal(0.0, 1.0, size=len(start)))
+    best = None
+    for guess in starts:
+        try:
+            found = minimize(objective, np.asarray(guess, dtype=float), method="Nelder-Mead", options={"maxiter": 2000})
+        except Exception:
+            continue
+        if math.isfinite(found.fun) and (best is None or found.fun < best.fun):
+            best = found
+    if best is None or not best.success or not math.isfinite(best.fun):
+        return blank(req, "singular", "minimize", seed=seed)
+    point = {sym.name: float(val) for sym, val in zip(symbols, best.x)}
+    details = {"value": float(best.fun), "unit": None, "x": point}
+    if req.get("mode") == "lab":
+        return blank(req, "ok", "minimize", lab={"value": details["value"], "uncertainty": None, "unit": None, "x": point}, seed=seed)
+    return blank(req, "ok", "minimize", numeric=details, seed=seed)
+
+
+def op_roots(req, args):
+    import numpy as np
+    sympy = req["_sympy"]
+    expr = build(args["expr"], {"funcs": set(), "ivar": None}, sympy)
+    var = sympy.Symbol(args["var"])
+    extra = sorted(sym.name for sym in expr.free_symbols if sym != var)
+    if extra:
+        raise Fail("missing_input", missing=extra, method="roots")
+    if req.get("mode") == "exact":
+        try:
+            solution = sympy.solveset(expr, var, domain=sympy.S.Complexes)
+        except Exception:
+            return blank(req, "no_closed_form", "roots")
+        if isinstance(solution, sympy.ConditionSet) or solution.has(sympy.ConditionSet):
+            return blank(req, "no_closed_form", "roots")
+        return finish_exact(req, solution, sympy, "roots")
+    real = []
+    try:
+        solution = sympy.solveset(expr, var, domain=sympy.S.Reals)
+        if isinstance(solution, sympy.FiniteSet):
+            for item in list(solution):
+                value = complex(item.evalf())
+                if math.isfinite(value.real) and abs(value.imag) < 1e-8:
+                    real.append(float(value.real))
+    except Exception:
+        real = []
+    packed = []
+    polynomial = False
+    try:
+        polynomial = bool(expr.is_polynomial(var)) and expr != 0
+    except Exception:
+        polynomial = False
+    if polynomial:
+        poly = sympy.Poly(sympy.expand(expr), var)
+        if poly.degree() >= 1:
+            coeffs = [complex(coeff.evalf()) for coeff in poly.all_coeffs()]
+            for root in np.roots(coeffs):
+                re = float(np.real(root))
+                im = float(np.imag(root))
+                if abs(im) < 1e-8 * max(1.0, abs(re)):
+                    im = 0.0
+                    if not any(abs(re - item) < 1e-6 for item in real):
+                        real.append(re)
+                packed.append({"re": re, "im": im})
+    if not real:
+        real = scan_real_roots(expr, var, sympy)
+    if not packed:
+        packed = [{"re": item, "im": 0.0} for item in real]
+    real = sorted(real)
+    details = {"value": real, "real": real, "roots": packed, "n": len(packed), "unit": None}
+    if req.get("mode") == "lab":
+        return blank(req, "ok", "roots", lab={"value": real[0] if len(real) == 1 else None, "uncertainty": None, "unit": None, "real": real})
+    return blank(req, "ok", "roots", numeric=details)
+
+
+def op_nintegrate(req, args):
+    from scipy.integrate import quad
+    sympy = req["_sympy"]
+    expr = build(args["expr"], {"funcs": set(), "ivar": None}, sympy)
+    var = sympy.Symbol(args["var"])
+    extra = sorted(sym.name for sym in expr.free_symbols if sym != var)
+    if extra:
+        raise Fail("missing_input", missing=extra, method="quad")
+    a = as_bound(args["a"], sympy)
+    b = as_bound(args["b"], sympy)
+    try:
+        symbolic = sympy.integrate(expr, (var, a, b))
+    except Exception:
+        symbolic = None
+    if symbolic is not None and divergent(symbolic, sympy):
+        return blank(req, "diverges", "quad")
+    if symbolic is not None and not getattr(symbolic, "has", lambda *_args: False)(sympy.Integral) and not symbolic.free_symbols:
+        try:
+            value = complex(symbolic.evalf()).real
+            if math.isfinite(value):
+                return blank(req, "ok", "evalf", numeric={"value": value, "abserr": 0.0, "unit": None})
+        except Exception:
+            pass
+    def integrand(t):
+        return float(numeric_of(expr, {var: float(t)}, sympy))
+    lo = math.inf if a == sympy.oo else (-math.inf if a == -sympy.oo else float(a))
+    hi = math.inf if b == sympy.oo else (-math.inf if b == -sympy.oo else float(b))
+    try:
+        val, err = quad(integrand, lo, hi, limit=200, epsabs=1e-8)
+    except Exception:
+        return blank(req, "diverges", "quad")
+    if not math.isfinite(val) or not math.isfinite(err) or err > 1e-3 * max(1.0, abs(val)):
+        return blank(req, "diverges", "quad")
+    return blank(req, "ok", "quad", numeric={"value": float(val), "abserr": float(err), "unit": None})
+
+
+def op_ivp(req, args):
+    from scipy.integrate import solve_ivp
+    sympy = req["_sympy"]
+    if req.get("mode") == "exact":
+        return blank(req, "no_closed_form", "ivp")
+    func_name = args["func"]
+    ivar = args["ivar"]
+    expr = build(args["eq"], {"funcs": {func_name}, "ivar": ivar}, sympy)
+    func = sympy.Function(func_name)
+    x = sympy.Symbol(ivar)
+    applied = func(x)
+    order = int(sympy.ode_order(expr, applied))
+    if order < 1:
+        raise Fail("missing_input", missing=["derivative"], method="ivp")
+    solved = sympy.solve(expr, sympy.Derivative(applied, x, order))
+    if not solved:
+        return blank(req, "singular", "ivp")
+    rhs = solved[0]
+    items = args.get("ics") or []
+    if not items:
+        raise Fail("missing_input", missing=["ics"], method="ivp")
+    t0 = None
+    state0 = [None] * order
+    for item in items:
+        point = float(as_bound(item["point"], sympy))
+        value = float(as_bound(item["value"], sympy))
+        level = int(item.get("order") or 0)
+        if t0 is None:
+            t0 = point
+        elif abs(point - t0) > 1e-9:
+            raise Fail("missing_input", missing=["ics"], method="ivp")
+        if level < 0 or level >= order:
+            raise Fail("missing_input", missing=["ics"], method="ivp")
+        state0[level] = value
+    missing_orders = [f"order {index}" for index, value in enumerate(state0) if value is None]
+    if missing_orders:
+        raise Fail("missing_input", missing=missing_orders, method="ivp")
+    y_syms = [sympy.Symbol(f"_y{index}") for index in range(order)]
+    repl = {applied: y_syms[0]}
+    for index in range(1, order):
+        repl[sympy.Derivative(applied, x, index)] = y_syms[index]
+    rhs_e = sympy.simplify(rhs.xreplace(repl))
+    def rhs_sys(t, state):
+        values = {x: float(t)}
+        for index, sym in enumerate(y_syms):
+            values[sym] = float(state[index])
+        highest = float(numeric_of(rhs_e, values, sympy))
+        return [float(state[index + 1]) for index in range(order - 1)] + [highest]
+    if args.get("points"):
+        targets = [float(as_bound(point, sympy)) for point in args["points"]]
+    else:
+        targets = [t0 + index / 20 for index in range(21)]
+    def key(t):
+        return round(float(t), 12)
+    out = {}
+    for t in targets:
+        if abs(float(t) - t0) <= 1e-12:
+            out[key(t)] = float(state0[0])
+    def run(ts):
+        if not ts:
+            return
+        sol = solve_ivp(rhs_sys, (t0, ts[-1]), state0, t_eval=ts, rtol=1e-8, atol=1e-9)
+        if not sol.success or sol.y.shape[1] != len(ts):
+            raise Fail("diverges", method="ivp")
+        for t, y in zip(ts, sol.y[0]):
+            if not math.isfinite(float(y)):
+                raise Fail("diverges", method="ivp")
+            out[key(t)] = float(y)
+    run(sorted(key(t) for t in targets if float(t) > t0 + 1e-12))
+    run(sorted((key(t) for t in targets if float(t) < t0 - 1e-12), reverse=True))
+    series = [out[key(t)] for t in targets]
+    details = {"value": series[-1], "unit": None, "t0": t0, "n": len(series), "t": [float(t) for t in targets], "y": series}
+    if req.get("mode") == "lab":
+        return blank(req, "ok", "ivp", lab={"value": series[-1], "uncertainty": None, "unit": None, "t": details["t"], "y": series})
+    return blank(req, "ok", "ivp", numeric=details)
+
+
+def numeric_of(expr, values, sympy):
+    import numpy as np
+    if getattr(expr, "is_Symbol", False):
+        if expr not in values:
+            raise Fail("missing_input", missing=[expr.name], method="numeric")
+        return values[expr]
+    if getattr(expr, "is_Atom", False):
+        if expr in (sympy.oo, -sympy.oo, sympy.zoo, sympy.nan):
+            raise Fail("diverges", method="numeric")
+        return complex(expr.evalf()).real
+    if expr.func is sympy.Add:
+        total = numeric_of(expr.args[0], values, sympy)
+        for arg in expr.args[1:]:
+            total = total + numeric_of(arg, values, sympy)
+        return total
+    if expr.func is sympy.Mul:
+        total = numeric_of(expr.args[0], values, sympy)
+        for arg in expr.args[1:]:
+            total = total * numeric_of(arg, values, sympy)
+        return total
+    if expr.func is sympy.Pow:
+        return numeric_of(expr.args[0], values, sympy) ** numeric_of(expr.args[1], values, sympy)
+    table = {
+        sympy.sin: np.sin, sympy.cos: np.cos, sympy.tan: np.tan,
+        sympy.asin: np.arcsin, sympy.acos: np.arccos, sympy.atan: np.arctan, sympy.atan2: np.arctan2,
+        sympy.sinh: np.sinh, sympy.cosh: np.cosh, sympy.tanh: np.tanh,
+        sympy.exp: np.exp, sympy.log: np.log, sympy.sqrt: np.sqrt, sympy.Abs: np.abs,
+        sympy.sign: np.sign, sympy.floor: np.floor, sympy.ceiling: np.ceil,
+    }
+    if expr.func in table:
+        args = [numeric_of(arg, values, sympy) for arg in expr.args]
+        if expr.func is sympy.log and len(args) == 2:
+            return np.log(args[0]) / np.log(args[1])
+        return table[expr.func](*args)
+    if expr.func in (sympy.Min, sympy.Max):
+        args = [numeric_of(arg, values, sympy) for arg in expr.args]
+        reduce = np.minimum if expr.func is sympy.Min else np.maximum
+        result = args[0]
+        for arg in args[1:]:
+            result = reduce(result, arg)
+        return result
+    raise Fail("engine_unavailable", method="rejected_source")
+
+
+def scan_real_roots(expr, var, sympy):
+    lo, hi, steps = -20.0, 20.0, 401
+    xs = [lo + (hi - lo) * i / (steps - 1) for i in range(steps)]
+    ys = []
+    for x in xs:
+        try:
+            ys.append(float(numeric_of(expr, {var: x}, sympy)))
+        except Exception:
+            ys.append(float("nan"))
+    roots = []
+    for i in range(len(xs) - 1):
+        y0, y1 = ys[i], ys[i + 1]
+        if not (math.isfinite(y0) and math.isfinite(y1)):
+            continue
+        if y0 == 0:
+            if not any(abs(xs[i] - item) < 1e-3 for item in roots):
+                roots.append(xs[i])
+            continue
+        if y0 * y1 > 0:
+            continue
+        a, b, fa = xs[i], xs[i + 1], y0
+        for _ in range(60):
+            mid = (a + b) / 2
+            try:
+                fm = float(numeric_of(expr, {var: mid}, sympy))
+            except Exception:
+                break
+            if not math.isfinite(fm):
+                break
+            if fa * fm <= 0:
+                b = mid
+            else:
+                a, fa = mid, fm
+        root = (a + b) / 2
+        if not any(abs(root - item) < 1e-3 for item in roots):
+            roots.append(root)
+    return roots
 
 
 def column(items, req):

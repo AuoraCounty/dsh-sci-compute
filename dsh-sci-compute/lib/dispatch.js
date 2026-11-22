@@ -28,7 +28,13 @@ const EXPR_FIELD = {
   "calc.integrate": "expr",
   "calc.series": "expr",
   "calc.ode": "eq",
+  "calc.roots": "expr",
+  "calc.nintegrate": "expr",
+  "ode.ivp": "eq",
+  "fit.nonlinear": "expr",
   "uncertainty.propagate": "expr",
+  "uncertainty.montecarlo": "expr",
+  "optimize.minimize": "expr",
   "units.check": "expr",
 };
 const FILE_FIELDS = ["x", "y", "values", "matrix", "a", "b", "vectors", "weights"];
@@ -112,6 +118,12 @@ export async function compute(request, config = {}) {
   const args = materialize(request.args);
   const count = countNumbers(args);
   if (count > cfg.maxInlineNumbers) throw new Error("maxInlineNumbers");
+  if (spec.id === "uncertainty.montecarlo") {
+    const draws = args.draws ?? 10000;
+    if (!Number.isInteger(draws) || draws < 1 || draws > cfg.monteCarloMaxDraws) {
+      throw new Error("monteCarloMaxDraws");
+    }
+  }
   if (spec.engine === "js") return runJs(spec, args, base, cfg);
   const health = await ensureHealth(cfg);
   if (!health.ok) {
@@ -150,6 +162,9 @@ export async function compute(request, config = {}) {
     result.lab.text = formatted.text;
     result.lab.uncertainty = formatted.uncertainty;
   }
+  if (result && result.seed == null && inputsEcho && Object.prototype.hasOwnProperty.call(inputsEcho, "seed")) {
+    result.seed = inputsEcho.seed;
+  }
   return result;
 }
 
@@ -174,9 +189,12 @@ function missingNames(op, ast, args) {
     const units = args.units ?? {};
     return names.filter((name) => units[name] === undefined);
   }
-  if (op === "expr.eval" || op === "uncertainty.propagate") {
+  if (op === "expr.eval" || op === "uncertainty.propagate" || op === "uncertainty.montecarlo" || op === "optimize.minimize") {
     const vars = args.vars ?? {};
     return names.filter((name) => measurementMissing(vars[name]));
+  }
+  if (op === "calc.roots" || op === "calc.nintegrate") {
+    return names.filter((name) => name !== args.var);
   }
   return [];
 }
